@@ -1,0 +1,1211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Find every place that needs your new address when you move house. Runs in your browser; nothing is stored.">
+<title>Address Sweep</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=Public+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a parcel-label header band, a sticky four-step tab strip, then one column (max 880px) of label slips. */
+:root{
+  --paper:#F1F4F8; --card:#FFFFFF; --ink:#131A25; --muted:#536072; --line:#D5DCE6; --line-strong:#9AA6B6;
+  --accent:#1C47C9; --accent-ink:#FFFFFF; --accent-soft:#E2E9FB;
+  --tape:#F2C335; --tape-ink:#2B2107; --done:#13784A; --done-soft:#DDF1E6; --warn:#A6481A;
+  --display:"Archivo","Arial Narrow",system-ui,sans-serif;
+  --body:"Public Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#0E1218; --card:#161C25; --ink:#E6EBF2; --muted:#98A4B5; --line:#283140; --line-strong:#4A5668;
+  --accent:#8AA8FF; --accent-ink:#0A0F1C; --accent-soft:#1A2544;
+  --tape:#E0B734; --tape-ink:#1E1704; --done:#4CC48A; --done-soft:#14301F; --warn:#F09A6A; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#0E1218; --card:#161C25; --ink:#E6EBF2; --muted:#98A4B5; --line:#283140; --line-strong:#4A5668;
+  --accent:#8AA8FF; --accent-ink:#0A0F1C; --accent-soft:#1A2544;
+  --tape:#E0B734; --tape-ink:#1E1704; --done:#4CC48A; --done-soft:#14301F; --warn:#F09A6A; color-scheme:dark}
+
+*{box-sizing:border-box}
+html{color-scheme:light}
+body{margin:0;font-size:15px}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{background:var(--paper);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--paper)}
+.wrap{max-width:880px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0}
+h2{font-size:1.45rem;font-stretch:112%;font-weight:750;letter-spacing:-.01em}
+h3{font-size:1rem;font-weight:700}
+p{margin:0}
+.muted{color:var(--muted)}
+.mono{font-family:var(--mono)}
+
+/* header */
+header{padding-block:28px 18px}
+.hdr{display:flex;gap:20px;align-items:flex-end;justify-content:space-between;flex-wrap:wrap}
+.brand h1{font-size:clamp(2rem,6vw,3.1rem);font-stretch:125%;font-weight:800;letter-spacing:-.02em;line-height:.95;text-transform:uppercase}
+.brand p{margin-top:10px;max-width:58ch;color:var(--muted)}
+.stamp{border:2px dashed var(--line-strong);border-radius:6px;padding:10px 14px;font-family:var(--mono);font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;min-width:0;max-width:100%}
+.stamp b{display:block;font-size:.95rem;color:var(--ink);letter-spacing:.02em;margin-top:2px}
+.privacy{margin-top:14px;display:inline-flex;gap:8px;align-items:center;background:var(--done-soft);color:var(--done);border-radius:999px;padding:5px 12px;font-size:.82rem;font-weight:600}
+.privacy svg{flex:none}
+
+/* tabs */
+nav.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--paper);border-bottom:1px solid var(--line)}
+.tablist{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
+.tablist::-webkit-scrollbar{display:none}
+.tab{appearance:none;border:0;background:none;color:var(--muted);font:600 .92rem var(--body);padding:12px 12px 11px;border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap;display:flex;gap:8px;align-items:center}
+.tab .n{font-family:var(--mono);font-size:.75rem;border:1.5px solid currentColor;border-radius:4px;padding:0 5px;line-height:1.5}
+.tab .badge{font-family:var(--mono);font-size:.72rem;background:var(--line);color:var(--ink);border-radius:999px;padding:1px 7px}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.tab[aria-selected="true"] .n{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+main{padding-block:24px 64px}
+section.panel{display:grid;gap:22px}
+
+/* generic blocks */
+.block{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px;display:grid;gap:14px;min-width:0}
+.block>header{padding:0;display:grid;gap:4px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+label.f{display:grid;gap:6px;font-weight:600;font-size:.88rem;min-width:0}
+label.f span.h{font-weight:400;color:var(--muted);font-size:.82rem}
+select,input[type=text],input[type=date],input[type=search],textarea{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line-strong);border-radius:7px;padding:9px 11px;width:100%;min-width:0}
+textarea{resize:vertical;min-height:84px}
+.flags{display:flex;flex-wrap:wrap;gap:8px}
+.chk{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line-strong);border-radius:999px;padding:6px 12px 6px 9px;cursor:pointer;font-size:.88rem;user-select:none;background:var(--card)}
+.chk input{accent-color:var(--accent);margin:0;width:16px;height:16px}
+.chk:has(input:checked){background:var(--accent-soft);border-color:var(--accent)}
+.btn{appearance:none;font:600 .9rem var(--body);border-radius:7px;padding:9px 14px;cursor:pointer;border:1px solid var(--line-strong);background:var(--card);color:var(--ink);display:inline-flex;gap:7px;align-items:center;text-decoration:none;white-space:nowrap}
+.btn:hover{border-color:var(--ink)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.small{padding:5px 10px;font-size:.82rem}
+.btn.ghost{border-color:transparent;background:none;color:var(--muted)}
+.btn.ghost:hover{color:var(--ink)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.spacer{flex:1}
+.summary{display:flex;gap:16px;align-items:center;flex-wrap:wrap;background:var(--ink);color:var(--paper);border-radius:10px;padding:16px 18px}
+.summary .big{font-family:var(--display);font-stretch:125%;font-weight:800;font-size:2rem;line-height:1}
+.summary p{flex:1;min-width:200px}
+.summary .btn{background:var(--tape);color:var(--tape-ink);border-color:var(--tape)}
+
+/* email */
+.drop{border:2px dashed var(--line-strong);border-radius:10px;padding:22px;text-align:center;display:grid;gap:8px;justify-items:center;cursor:pointer;background:var(--paper)}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop strong{font-family:var(--display);font-stretch:110%;font-size:1.05rem}
+.ways{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
+.way{border:1px solid var(--line);border-radius:10px;padding:16px;display:grid;gap:10px;align-content:start;min-width:0}
+.way h3{display:flex;gap:8px;align-items:baseline}
+.way h3 .tag{font-family:var(--mono);font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+.qlist{display:grid;gap:6px}
+.q{display:flex;gap:8px;align-items:center;justify-content:space-between;border:1px solid var(--line);border-radius:7px;padding:7px 10px;font-size:.86rem}
+ol.steps{margin:0;padding-left:20px;display:grid;gap:4px;font-size:.9rem}
+.progress{height:8px;background:var(--line);border-radius:99px;overflow:hidden}
+.progress i{display:block;height:100%;background:var(--tape);width:0;transition:width .2s}
+.results{display:grid;gap:18px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--line-strong);border-radius:999px;padding:3px 4px 3px 10px;font-size:.84rem;background:var(--card)}
+.chip .x{appearance:none;border:0;background:none;color:var(--muted);cursor:pointer;font-size:1rem;line-height:1;padding:0 5px}
+.chip .ct{font-family:var(--mono);font-size:.72rem;color:var(--muted)}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;font-size:.86rem}
+th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{font-family:var(--mono);font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;background:var(--paper)}
+tr:last-child td{border-bottom:0}
+td.num{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right;width:1%}
+td .dom{font-family:var(--mono);font-size:.78rem;color:var(--muted);word-break:break-all}
+
+.signin{display:flex;flex-wrap:wrap;gap:10px}
+.bigbtn{padding:13px 18px;font-size:1rem}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+/* checklist */
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.meter{display:grid;gap:6px;flex:1;min-width:220px}
+.meter .lbl{font-family:var(--mono);font-size:.8rem;color:var(--muted)}
+.meter .progress{height:10px}
+.cat{display:grid;gap:8px}
+.cat>h3{font-family:var(--mono);font-size:.74rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:600;display:flex;gap:8px;align-items:center;padding-top:6px}
+.cat>h3::after{content:"";flex:1;height:1px;background:var(--line)}
+.slip{display:grid;grid-template-columns:auto 1fr auto;gap:4px 12px;align-items:start;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px 12px 12px 14px;min-width:0}
+.slip input[type=checkbox]{width:20px;height:20px;margin:2px 0 0;accent-color:var(--done);cursor:pointer}
+.slip .body{min-width:0;display:grid;gap:4px}
+.slip .name{font-weight:650;font-size:.97rem;overflow-wrap:anywhere}
+.slip .note{color:var(--muted);font-size:.86rem;overflow-wrap:anywhere}
+.slip .meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:2px}
+.stamp-s{font-family:var(--mono);font-size:.66rem;text-transform:uppercase;letter-spacing:.07em;border:1.5px dashed var(--line-strong);border-radius:4px;padding:1px 6px;color:var(--muted);white-space:nowrap}
+.stamp-s.when-b{border-color:var(--warn);color:var(--warn)}
+.stamp-s.mail{border-style:solid;border-color:var(--accent);color:var(--accent)}
+.slip .links{display:flex;gap:10px;flex-wrap:wrap;font-size:.84rem;margin-top:2px}
+.slip .links a{text-decoration:none;font-weight:600}
+.slip .links a:hover{text-decoration:underline}
+.slip .rm{appearance:none;border:0;background:none;color:var(--muted);cursor:pointer;font-size:1.15rem;line-height:1;padding:2px 4px;border-radius:4px}
+.slip .rm:hover{color:var(--ink);background:var(--paper)}
+.slip.done{background:var(--done-soft);border-color:transparent}
+.slip.done .name{text-decoration:line-through;text-decoration-color:var(--done);color:var(--muted)}
+.empty{border:1px dashed var(--line-strong);border-radius:10px;padding:18px;color:var(--muted);text-align:center}
+
+/* people */
+.person{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;display:grid;gap:10px;min-width:0}
+.person.done{background:var(--done-soft);border-color:transparent}
+.person .top{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center}
+.person .top input[type=checkbox]{width:20px;height:20px;accent-color:var(--done)}
+.person .fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.letter{display:grid;gap:8px}
+.letter textarea{min-height:230px;font-family:var(--body);line-height:1.55;background:var(--paper)}
+.suggest{display:flex;flex-wrap:wrap;gap:6px}
+.suggest button{appearance:none;font:500 .84rem var(--body);border:1px dashed var(--line-strong);background:none;color:var(--ink);border-radius:999px;padding:5px 11px;cursor:pointer}
+.suggest button:hover{border-style:solid;border-color:var(--accent);color:var(--accent)}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:9px 16px;border-radius:8px;font-weight:600;font-size:.88rem;z-index:20;max-width:calc(100% - 32px)}
+.note-box{border-left:3px solid var(--tape);padding:4px 0 4px 12px;font-size:.88rem;color:var(--muted)}
+details>summary{cursor:pointer;font-weight:600}
+[hidden]{display:none!important}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+  <header>
+    <div class="hdr">
+      <div class="brand">
+        <h1>Address<br>Sweep</h1>
+        <p>Every place that needs your new address, found and ticked off. Pick your move, scan your email for accounts you've forgotten, then work through the list.</p>
+        <div class="privacy"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1 2 3.5v4C2 11 4.6 14.2 8 15c3.4-.8 6-4 6-7.5v-4L8 1Zm-1 10L4.3 8.3l1.1-1.1L7 8.8l3.6-3.6 1.1 1.1L7 11Z"/></svg>Runs in this tab only. Nothing is saved or sent.</div>
+      </div>
+      <div class="stamp" aria-live="polite">Moving<b id="stampRoute">UK → UK</b><span id="stampDate">Date not set</span></div>
+    </div>
+  </header>
+</div>
+
+<nav class="tabs"><div class="wrap"><div class="tablist" role="tablist">
+  <button class="tab" role="tab" id="tab-move" aria-controls="p-move" aria-selected="true"><span class="n">1</span>Your move</button>
+  <button class="tab" role="tab" id="tab-mail" aria-controls="p-mail" aria-selected="false"><span class="n">2</span>Scan your email<span class="badge" id="bMail" hidden>0</span></button>
+  <button class="tab" role="tab" id="tab-list" aria-controls="p-list" aria-selected="false"><span class="n">3</span>Checklist<span class="badge" id="bList">0</span></button>
+  <button class="tab" role="tab" id="tab-people" aria-controls="p-people" aria-selected="false"><span class="n">4</span>Tell by hand<span class="badge" id="bPeople">0</span></button>
+</div></div></nav>
+
+<main class="wrap">
+
+<!-- 1 YOUR MOVE -->
+<section class="panel" id="p-move" role="tabpanel" aria-labelledby="tab-move">
+  <div class="block">
+    <header><h2>Where are you moving?</h2><p class="muted">Government services differ by country, so these decide the official part of your list.</p></header>
+    <div class="grid2">
+      <label class="f">Moving from<select id="from"></select></label>
+      <label class="f">Moving to<select id="to"></select></label>
+      <label class="f">Moving date <span class="h">Optional. Used in letters.</span><input type="date" id="date"></label>
+    </div>
+  </div>
+  <div class="block">
+    <header><h2>About you</h2><p class="muted">Tick what applies. Each one adds the services that go with it.</p></header>
+    <div class="flags" id="flags"></div>
+  </div>
+  <div class="block">
+    <header><h2>Addresses</h2><p class="muted">Optional. Fills in the letters on step 4 and the copy button on the checklist. Kept in this tab only.</p></header>
+    <div class="grid2">
+      <label class="f">Your name(s)<input type="text" id="who" placeholder="e.g. Sam and Alex Taylor" autocomplete="name"></label>
+      <label class="f">New phone or email <span class="h">Optional, for letters</span><input type="text" id="contact" placeholder="e.g. 07700 900123"></label>
+      <label class="f">Old address<textarea id="oldAddr" placeholder="12 Elm Road&#10;Leeds LS6 2AB"></textarea></label>
+      <label class="f">New address<textarea id="newAddr" placeholder="4 Harbour Street&#10;Bristol BS1 5TY"></textarea></label>
+    </div>
+  </div>
+  <div class="summary">
+    <div class="big" id="sumCount">0</div>
+    <p>places on your checklist so far. Scanning your email usually finds the ones people forget: old pensions, store cards, insurers, subscriptions.</p>
+    <button class="btn" data-go="mail">Scan your email →</button>
+  </div>
+</section>
+
+<!-- 2 EMAIL -->
+<section class="panel" id="p-mail" role="tabpanel" aria-labelledby="tab-mail" hidden>
+  <div class="block">
+    <header><h2>Find accounts in your email</h2>
+      <p class="muted">Anyone who emails you a bill, a statement or an order confirmation probably has your address. Sign in and Address Sweep reads the sender of each email, right here in your browser. Nothing is sent to us or stored: there is no “us”, only this page.</p></header>
+    <div class="signin">
+      <button class="btn primary bigbtn" id="gBtn"><svg width="18" height="18" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M1 3h14v10H1V3Zm1.5 1.5v.3L8 8.6l5.5-3.8v-.3h-11Zm11 1.9L8 10.2 2.5 6.4v5.1h11V6.4Z"/></svg>Scan Gmail</button>
+      <button class="btn primary bigbtn" id="mBtn"><svg width="18" height="18" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M1 3h14v10H1V3Zm1.5 1.5v.3L8 8.6l5.5-3.8v-.3h-11Zm11 1.9L8 10.2 2.5 6.4v5.1h11V6.4Z"/></svg>Scan Outlook, Hotmail or Live</button>
+    </div>
+    <p class="muted" style="font-size:.86rem">You sign in with Google or Microsoft on their own page. Address Sweep asks only to see who sent each email (Google calls this “metadata”, Microsoft “basic mail”), never what the emails say. It looks at the last 3 years, up to 5,000 emails. The access is held in this tab only and ends when you close it.</p>
+    <p class="muted" id="authNote" style="font-size:.86rem" hidden></p>
+    <div id="scanProg" hidden><div class="row"><span class="mono" id="scanLbl" style="font-size:.8rem">Reading…</span><span class="spacer"></span><button class="btn small ghost" id="scanStop">Stop</button></div><div class="progress"><i id="scanBar"></i></div></div>
+    <details>
+      <summary>Use another email provider, or don't want to sign in?</summary>
+      <div style="display:grid;gap:12px;margin-top:12px">
+        <p class="muted" style="font-size:.88rem">Export your mailbox and drop it here. Apple Mail: Mailbox → Export Mailbox. Thunderbird: mailbox files are already .mbox. Gmail without signing in: <a href="https://takeout.google.com/" target="_blank" rel="noopener">Google Takeout</a> → Mail. The file is read in this tab and never uploaded anywhere.</p>
+        <div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose email export files">
+          <strong>Drop .mbox, .eml or .txt files here</strong>
+          <span class="muted" style="font-size:.85rem">or click to choose. Multi‑GB exports work.</span>
+          <input type="file" id="file" multiple accept=".mbox,.eml,.txt,.csv,.mbx,.json,.html,text/plain,message/rfc822" hidden>
+        </div>
+        <label class="f">Or paste a list of email addresses or senders
+          <textarea id="paste" placeholder="Paste addresses, a contacts export, copied inbox pages…"></textarea></label>
+    <div class="row">
+      <button class="btn primary" id="scanPaste">Find services</button>
+      <button class="btn ghost" id="sample">Try with example text</button>
+      <span class="spacer"></span>
+      <span class="muted mono" style="font-size:.8rem" id="scanStat"></span>
+    </div>
+      </div>
+    </details>
+  </div>
+
+  <div class="results" id="results"></div>
+</section>
+
+<!-- 3 CHECKLIST -->
+<section class="panel" id="p-list" role="tabpanel" aria-labelledby="tab-list" hidden>
+  <div class="block">
+    <div class="toolbar">
+      <div class="meter"><span class="lbl" id="meterLbl">0 of 0 done</span><div class="progress"><i id="meterBar"></i></div></div>
+      <label class="chk"><input type="checkbox" id="hideDone">Hide done</label>
+    </div>
+    <div class="row">
+      <button class="btn" id="copyAll">Copy checklist</button>
+      <button class="btn" id="copyAddr">Copy new address</button>
+      <span class="spacer"></span>
+      <button class="btn ghost" id="restore" hidden>Show removed</button>
+    </div>
+    <p class="note-box">Nothing is saved. Before closing this tab, use <b>Copy checklist</b> and paste it into your notes or an email to yourself.</p>
+  </div>
+  <div id="list" style="display:grid;gap:18px"></div>
+  <div class="block">
+    <h3>Add something else</h3>
+    <div class="row">
+      <input type="text" id="customName" placeholder="e.g. Allotment society, kid's swim club" style="flex:1;min-width:200px">
+      <select id="customCat" style="width:auto"></select>
+      <button class="btn primary" id="customAdd">Add</button>
+    </div>
+  </div>
+</section>
+
+<!-- 4 PEOPLE -->
+<section class="panel" id="p-people" role="tabpanel" aria-labelledby="tab-people" hidden>
+  <div class="block">
+    <header><h2>People and places to tell by hand</h2>
+      <p class="muted">For anyone who can't be updated online: a grandparent without email, a neighbour who takes in parcels, the solicitor holding your will. Each one gets a ready-to-copy letter.</p></header>
+    <div>
+      <p style="font-weight:600;font-size:.88rem;margin-bottom:8px">Commonly forgotten</p>
+      <div class="suggest" id="suggest"></div>
+    </div>
+    <div class="row">
+      <input type="text" id="personName" placeholder="Name, e.g. Grandma Jean" style="flex:1;min-width:200px">
+      <button class="btn primary" id="personAdd">Add person</button>
+    </div>
+  </div>
+  <div id="people" style="display:grid;gap:12px"></div>
+</section>
+
+</main>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+if(window.opener&&/[?&](code|error)=/.test(location.search)){document.title='Signing in';document.body.innerHTML='<p style="padding:24px;font-family:system-ui">Signing in…</p>';throw new Error('signin-popup')}
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+const CATS=[['post','Post & government'],['money','Money'],['insurance','Insurance'],['home','Home & utilities'],['health','Health'],['work','Work & study'],['car','Car & transport'],['online','Shopping, subscriptions & accounts'],['other','Other senders from your email'],['custom','Your additions']];
+const CATNAME=Object.fromEntries(CATS);
+const WHEN={b:'Before move',m:'Moving week',a:'After move'};
+const WHEN_ORDER={b:0,m:1,a:2};
+const HOW={on:'Online',po:'By post',ip:'In person',ph:'Phone'};
+const FLAGS=[['drive','I drive or own a vehicle'],['rent','I rent (old or new home)'],['own','I own or am buying'],['work','I\'m employed'],['self','I\'m self-employed'],['student','I study or have a student loan'],['kids','I have children'],['pets','I have pets'],['benefits','I get benefits or a pension'],['invest','I have savings or investments'],['visa','I\'m not a citizen where I live']];
+
+// [cat, name, note, url, how, when, flag, scope]  scope: from = old country, to = new country, leave = only when leaving the old country
+const COUNTRIES={
+US:{n:'United States',s:'US',items:[
+ ['post','USPS mail forwarding','Forwards mail for up to 12 months. Signing up online has a small ID-check fee.','https://moversguide.usps.com/','on','b','','from'],
+ ['post','IRS (federal tax)','File Form 8822, or use the new address on your next return.','https://www.irs.gov/forms-pubs/about-form-8822','po','a','','to'],
+ ['post','State tax agency','Moving state usually means a part-year return in each state.','','on','a','','to'],
+ ['post','Social Security and Medicare','Update in your my Social Security account. Medicare uses the same record.','https://www.ssa.gov/myaccount/','on','a','benefits','to'],
+ ['post','Voter registration','Re-register at the new address. Deadlines can be up to 30 days before an election.','https://vote.gov/','on','a','','to'],
+ ['car','DMV: driver\'s license','Most states want the new address within 10 to 30 days. A new state means a new license.','','ip','a','drive','to'],
+ ['car','DMV: vehicle registration and title','Update, or re-register the vehicle in the new state.','','ip','a','drive','to'],
+ ['post','USCIS (Form AR-11)','Non-citizens must report a move within 10 days.','https://www.uscis.gov/ar-11','on','a','visa','to'],
+ ['post','Selective Service','Men aged 18 to 25 must update within 10 days.','https://www.sss.gov/','on','a','','to'],
+ ['post','Veterans Affairs','If you get VA benefits or care.','https://www.va.gov/','on','a','benefits','to'],
+ ['post','Overseas voting (FVAP)','Request absentee ballots while abroad.','https://www.fvap.gov/','on','a','','leave'],
+ ['money','Check your credit report','Make sure the new address appears and nothing unknown is linked to the old one.','https://www.annualcreditreport.com/','on','a','','to'],
+]},
+UK:{n:'United Kingdom',s:'UK',items:[
+ ['post','Royal Mail Redirection','Paid, for 3, 6 or 12 months. Apply at least 5 working days ahead.','https://www.royalmail.com/personal/receiving-mail/redirection','on','b','','from'],
+ ['post','Electoral register','Register at the new address. It also helps your credit score.','https://www.gov.uk/register-to-vote','on','a','','to'],
+ ['post','Council tax (old and new council)','Tell both councils your moving date so the old bill stops and the new one starts.','https://www.gov.uk/council-tax','on','m','','to'],
+ ['post','HMRC (tax and National Insurance)','Updates income tax, National Insurance and Child Benefit records.','https://www.gov.uk/tell-hmrc-change-address','on','a','','to'],
+ ['home','TV Licence','Move the licence to the new address.','https://www.tvlicensing.co.uk/','on','m','','to'],
+ ['car','DVLA: driving licence','Free online. You can be fined up to £1,000 for not telling them.','https://www.gov.uk/change-address-driving-licence','on','a','drive','to'],
+ ['car','DVLA: vehicle logbook (V5C)','Update the address on each vehicle\'s logbook.','https://www.gov.uk/change-vehicle-details-registration-certificate','on','a','drive','to'],
+ ['post','DWP benefits and State Pension','Report the change for each benefit you get.','https://www.gov.uk/report-benefits-change-circumstances','on','a','benefits','to'],
+ ['work','Student Loans Company','Update your address in your online repayment account.','','on','a','student','to'],
+ ['money','NS&I (Premium Bonds)','So prize notices and letters reach you.','https://www.nsandi.com/','on','a','invest','to'],
+ ['post','UK Visas and Immigration','Update the address on your UKVI account or eVisa.','','on','a','visa','to'],
+ ['money','Credit reference agencies','Check Experian, Equifax and TransUnion show the new address once lenders update.','','on','a','','to'],
+ ['post','HMRC: leaving the UK','Tell HMRC you are leaving, usually with form P85.','','on','b','','leave'],
+ ['post','Register as an overseas voter','You can stay on the UK electoral register from abroad.','https://www.gov.uk/register-to-vote','on','a','','leave'],
+]},
+IE:{n:'Ireland',s:'IE',items:[
+ ['post','An Post Redirect','Paid mail redirection.','https://www.anpost.com/','on','b','','from'],
+ ['post','Revenue (myAccount)','Update your address for income tax and USC.','https://www.revenue.ie/','on','a','','to'],
+ ['post','Register of electors','Update your entry on the electoral register.','https://www.checktheregister.ie/','on','a','','to'],
+ ['car','NDLS driving licence','Update the address on your licence.','https://www.ndls.ie/','on','a','drive','to'],
+ ['car','Motor tax and vehicle registration','Change the address on the vehicle registration certificate.','https://www.motortax.ie/','on','a','drive','to'],
+ ['post','MyWelfare (Social Protection)','Report the move for any payment or pension.','https://www.mywelfare.ie/','on','a','benefits','to'],
+ ['post','Immigration permission (IRP)','Tell Immigration Service Delivery your new address.','','on','a','visa','to'],
+]},
+DE:{n:'Germany',s:'DE',items:[
+ ['post','Anmeldung at the Bürgeramt','Within 14 days of moving in. Bring ID and the landlord\'s Wohnungsgeberbestätigung. Your ID card gets the new address.','','ip','a','','to'],
+ ['post','Abmeldung','Deregister before you leave Germany.','','ip','b','','leave'],
+ ['post','Deutsche Post Nachsendeservice','Paid mail forwarding.','https://www.deutschepost.de/','on','b','','from'],
+ ['home','Rundfunkbeitrag','Update the broadcasting fee address, or merge with a flatmate\'s account.','https://www.rundfunkbeitrag.de/','on','a','','to'],
+ ['car','Zulassungsstelle (vehicle registration)','Update the Fahrzeugschein, often at the same visit as the Anmeldung.','','ip','a','drive','to'],
+ ['health','Krankenkasse','Tell your health insurer the new address.','','on','a','','to'],
+ ['post','Familienkasse (Kindergeld)','Report the new address.','','on','a','kids','to'],
+ ['post','Ausländerbehörde','Your residence permit may need updating.','','ip','a','visa','to'],
+ ['post','Finanzamt','Usually updated from the Anmeldung. Tell them directly if you are self-employed.','','on','a','self','to'],
+]},
+FR:{n:'France',s:'FR',items:[
+ ['post','Changement d\'adresse en ligne','One form on service-public.fr tells CAF, Assurance Maladie, impôts, France Travail, pension funds and others.','https://www.service-public.fr/','on','a','','to'],
+ ['post','La Poste réexpédition','Paid mail forwarding.','https://www.laposte.fr/','on','b','','from'],
+ ['car','Carte grise (ANTS)','Required within one month of moving. Free online.','https://ants.gouv.fr/','on','a','drive','to'],
+ ['post','Liste électorale','Register in your new commune.','https://www.service-public.fr/','on','a','','to'],
+ ['post','Impôts','Check the new address in your espace particulier.','https://www.impots.gouv.fr/','on','a','','to'],
+ ['post','Titre de séjour (préfecture)','Report the new address within 3 months.','','on','a','visa','to'],
+]},
+NL:{n:'Netherlands',s:'NL',items:[
+ ['post','Register with the new gemeente','Within 5 days of moving. Most do it online with DigiD. Tax office, RDW and DUO update from this.','','on','a','','to'],
+ ['post','Deregister from the BRP','Required if you leave for more than 8 months.','','on','b','','leave'],
+ ['post','PostNL Verhuisservice','Paid mail forwarding.','https://www.postnl.nl/','on','b','','from'],
+ ['health','Zorgverzekering','Check your health insurer has the new address.','','on','a','','to'],
+]},
+BE:{n:'Belgium',s:'BE',items:[
+ ['post','Register at the new commune','Within 8 days. A local police officer usually visits to confirm you live there.','','ip','a','','to'],
+ ['post','bpost forwarding','Paid mail forwarding.','https://www.bpost.be/','on','b','','from'],
+ ['health','Mutualité / ziekenfonds','Tell your health fund.','','on','a','','to'],
+]},
+ES:{n:'Spain',s:'ES',items:[
+ ['post','Empadronamiento','Register on the padrón at the new ayuntamiento.','','ip','a','','to'],
+ ['post','Correos redirection','Paid mail forwarding.','https://www.correos.es/','on','b','','from'],
+ ['car','DGT: licence and vehicle address','Update online or at a Jefatura.','https://www.dgt.es/','on','a','drive','to'],
+ ['post','Agencia Tributaria','Update your tax address (modelo 030).','https://sede.agenciatributaria.gob.es/','on','a','','to'],
+ ['post','Seguridad Social','Update your address.','https://www.seg-social.es/','on','a','','to'],
+ ['post','Extranjería (TIE / NIE)','Report the change of address.','','ip','a','visa','to'],
+]},
+PT:{n:'Portugal',s:'PT',items:[
+ ['post','Cartão de Cidadão address','Change it online or in person. Tax and health records follow.','https://eportugal.gov.pt/','on','a','','to'],
+ ['post','CTT mail redirection','Paid mail forwarding.','https://www.ctt.pt/','on','b','','from'],
+ ['post','Portal das Finanças','Check your fiscal address.','https://www.portaldasfinancas.gov.pt/','on','a','','to'],
+ ['post','AIMA residence permit','Report your new address.','','on','a','visa','to'],
+]},
+IT:{n:'Italy',s:'IT',items:[
+ ['post','Cambio di residenza','Declare it at the Comune within 20 days, or online through ANPR.','https://www.anagrafenazionale.interno.it/','on','a','','to'],
+ ['post','Poste Italiane Seguimi','Paid mail forwarding.','https://www.poste.it/','on','b','','from'],
+ ['health','Medico di base (ASL)','Choose a new GP at the local ASL if you change area.','','ip','a','','to'],
+ ['post','Iscrizione AIRE','Register with AIRE if you move abroad for more than 12 months.','','on','a','','leave'],
+]},
+AT:{n:'Austria',s:'AT',items:[
+ ['post','Meldezettel','Register at the Meldeamt within 3 days of moving in.','https://www.oesterreich.gv.at/','ip','a','','to'],
+ ['post','Post Nachsendung','Paid mail forwarding.','https://www.post.at/','on','b','','from'],
+ ['home','ORF-Beitrag','Update the address for the household broadcasting levy.','','on','a','','to'],
+]},
+CH:{n:'Switzerland',s:'CH',items:[
+ ['post','Register with the commune','Within 14 days. Many cantons accept it online through eUmzug.','https://www.eumzug.swiss/','on','a','','to'],
+ ['post','Swiss Post forwarding','Paid mail forwarding.','https://www.post.ch/','on','b','','from'],
+ ['health','Health insurer (Krankenkasse)','Premiums depend on where you live. Tell them before you move.','','on','b','','to'],
+ ['car','Strassenverkehrsamt','Update licence and vehicle registration within 14 days.','','on','a','drive','to'],
+]},
+SE:{n:'Sweden',s:'SE',items:[
+ ['post','Skatteverket flyttanmälan','Report the move within a week. Many agencies update from this.','https://www.skatteverket.se/','on','m','','to'],
+ ['post','Svensk Adressändring','Mail forwarding. Separate from the Skatteverket notice.','https://www.adressandring.se/','on','b','','from'],
+ ['post','Försäkringskassan','Report the new address if you get payments.','','on','a','benefits','to'],
+ ['work','CSN','Check your address if you have student finance.','','on','a','student','to'],
+]},
+DK:{n:'Denmark',s:'DK',items:[
+ ['post','Report your move on borger.dk','Required within 5 days. Updates the CPR register.','https://www.borger.dk/','on','m','','to'],
+ ['post','PostNord forwarding','Paid mail forwarding.','https://www.postnord.dk/','on','b','','from'],
+]},
+NO:{n:'Norway',s:'NO',items:[
+ ['post','Skatteetaten flyttemelding','Report the move within 8 days.','https://www.skatteetaten.no/','on','m','','to'],
+ ['post','Posten ettersending','Paid mail forwarding.','https://www.posten.no/','on','b','','from'],
+]},
+FI:{n:'Finland',s:'FI',items:[
+ ['post','Posti move notice','One notice updates the population register (DVV), Kela, the tax office and Posti. Due within a week.','https://www.posti.fi/','on','m','','to'],
+]},
+PL:{n:'Poland',s:'PL',items:[
+ ['post','Zameldowanie','Register the new address at the gmina or online on gov.pl.','https://www.gov.pl/','on','a','','to'],
+ ['post','Poczta Polska redirection','Paid mail forwarding.','https://www.poczta-polska.pl/','on','b','','from'],
+ ['car','Vehicle registration','Update the dowód rejestracyjny within 30 days.','','ip','a','drive','to'],
+]},
+CA:{n:'Canada',s:'CA',items:[
+ ['post','Canada Post Mail Forwarding','Paid forwarding.','https://www.canadapost-postescanada.ca/','on','b','','from'],
+ ['post','Canada Revenue Agency','Update in CRA My Account. Benefits such as the CCB use this address.','https://www.canada.ca/en/revenue-agency.html','on','a','','to'],
+ ['post','Elections Canada','Update your voter registration.','https://www.elections.ca/','on','a','','to'],
+ ['health','Provincial health card','Moving province means applying for a new card.','','ip','a','','to'],
+ ['car','Provincial licence and registration','Update or transfer within the province\'s deadline.','','ip','a','drive','to'],
+]},
+AU:{n:'Australia',s:'AU',items:[
+ ['post','Australia Post mail redirection','Paid redirection.','https://auspost.com.au/','on','b','','from'],
+ ['post','myGov','Update your details once for the ATO, Medicare and Centrelink.','https://my.gov.au/','on','a','','to'],
+ ['post','Australian Electoral Commission','Update your enrolment.','https://www.aec.gov.au/','on','a','','to'],
+ ['car','State licence and rego','Update with your state transport authority.','','on','a','drive','to'],
+]},
+OTHER:{n:'Another country',s:'Other',items:[
+ ['post','Postal mail forwarding','Most national postal services offer paid forwarding.','','on','b','','from'],
+ ['post','Population or residents\' register','Many countries require you to register a new address within days of moving.','','ip','a','','to'],
+ ['post','Tax authority','Update your address for income tax.','','on','a','','to'],
+ ['post','Electoral register','Re-register to vote at your new address.','','on','a','','to'],
+ ['car','Driving licence and vehicle registration','Update the address or transfer the licence.','','ip','a','drive','to'],
+ ['post','Immigration authority','Report the new address on your permit or visa.','','on','a','visa','to'],
+]},
+};
+
+const ABROAD=[
+ ['post','Tell the tax office you are leaving','Some countries keep taxing you as a resident until you deregister.','','on','b',''],
+ ['money','Keep your old phone number for now','Banks send security codes by text. Keep the old SIM working until every bank has your new number and address.','','on','b',''],
+ ['money','Ask banks about living abroad','Some banks restrict or close accounts for non-residents.','','ph','b',''],
+ ['money','Pensions: give a foreign address','Make sure every pension provider can still reach you.','','on','a',''],
+ ['health','Healthcare in the new country','Register with the public system or arrange insurance before you need it.','','on','b',''],
+ ['car','Check your licence is valid there','Many countries require you to exchange a foreign licence within months.','','ip','a','drive'],
+ ['health','Pet travel paperwork','Microchip, vaccinations and a pet passport or health certificate.','','ip','b','pets'],
+ ['post','Register to vote from abroad','Most countries let citizens vote from overseas once registered.','','on','a',''],
+];
+
+const GENERIC=[
+ ['money','Bank and current accounts','Update every bank so new cards and letters reach you.','','on','b',''],
+ ['money','Credit and store cards','Card billing addresses are checked when you pay online.','','on','b',''],
+ ['money','Loans, car finance and buy-now-pay-later','Klarna, Affirm, PayPal credit and similar lenders.','','on','a',''],
+ ['money','Pensions and retirement accounts','Including old workplace pensions you no longer pay into.','','on','a',''],
+ ['money','Savings, investments and crypto','Brokerage, ISA or IRA accounts, and exchanges.','','on','a','invest'],
+ ['money','Payment apps','PayPal, Wise, Revolut, Venmo and similar.','','on','a',''],
+ ['insurance','Home or renters insurance','Arrange cover for the new home from moving day.','','on','b',''],
+ ['insurance','Car insurance','The price depends on where the car is kept. Update before you move.','','on','b','drive'],
+ ['insurance','Health insurance','Cover and price can change with location.','','on','b',''],
+ ['insurance','Life insurance','','','on','a',''],
+ ['insurance','Pet insurance','','','on','a','pets'],
+ ['insurance','Travel, gadget and phone insurance','','','on','a',''],
+ ['home','Electricity and gas','Take meter readings at both homes on moving day.','','on','m',''],
+ ['home','Water','','','on','m',''],
+ ['home','Broadband or internet','Book early. Installs can take a few weeks.','','on','b',''],
+ ['home','Mobile phone contract','','','on','a',''],
+ ['home','TV, streaming and satellite','The billing address matters even for streaming.','','on','a',''],
+ ['home','Old landlord or letting agent','Give a forwarding address for the deposit return.','','po','m','rent'],
+ ['home','Mortgage lender','','','on','b','own'],
+ ['home','Home alarm or security monitoring','','','ph','m',''],
+ ['home','Parking permit','Usually tied to the address. Apply for a new one.','','on','a','drive'],
+ ['health','Doctor','Register with a practice near the new home and tell the old one.','','ip','a',''],
+ ['health','Dentist','','','ph','a',''],
+ ['health','Optician','','','ph','a',''],
+ ['health','Pharmacy and repeat prescriptions','','','ip','a',''],
+ ['health','Vet','','','ph','a','pets'],
+ ['health','Pet microchip database','A legal requirement in some countries, including the UK.','','on','a','pets'],
+ ['work','Employer, HR and payroll','Payslips and tax forms use your home address.','','on','a','work'],
+ ['work','Clients, accountant and business registration','','','on','a','self'],
+ ['work','School, nursery or childcare','','','ip','b','kids'],
+ ['work','University or college','','','on','a','student'],
+ ['work','Professional bodies and unions','','','on','a','work'],
+ ['car','Breakdown cover','AA, RAC, AAA, ADAC and similar.','','on','a','drive'],
+ ['car','Toll and congestion accounts','E-ZPass, Dart Charge, ULEZ and similar.','','on','a','drive'],
+ ['online','Saved delivery addresses','Amazon, eBay and other shops. Delete the old address so orders don\'t go there by mistake.','','on','m',''],
+ ['online','Apple, Google and Microsoft accounts','Billing address for app stores and subscriptions.','','on','a',''],
+ ['online','Food delivery and ride apps','','','on','m',''],
+ ['online','Magazines, newspapers and subscription boxes','','','on','b',''],
+ ['online','Gym, clubs and loyalty schemes','Including supermarket cards and frequent flyer accounts.','','on','a',''],
+ ['online','Charities you give to','Gift Aid and tax receipts use your address.','','on','a',''],
+];
+
+// Known senders: "domains|Name|category|extra names". A leading ! on the name turns off matching by name (too common a word).
+const SERVICES=`chase.com,chase.co.uk|Chase|money
+bankofamerica.com,bofa.com|Bank of America|money
+wellsfargo.com|Wells Fargo|money
+citi.com,citibank.com|Citi|money|Citibank
+capitalone.com,capitalone.co.uk|Capital One|money
+americanexpress.com,aexp.com|American Express|money|Amex
+discover.com|!Discover|money
+usbank.com|U.S. Bank|money
+pnc.com|PNC|money
+schwab.com|Charles Schwab|money|Schwab
+fidelity.com,fidelity.co.uk|Fidelity|money
+vanguard.com,vanguardinvestor.co.uk,vanguard.co.uk|Vanguard|money
+robinhood.com|Robinhood|money
+sofi.com|SoFi|money
+ally.com|!Ally Bank|money
+venmo.com|Venmo|money
+paypal.com,paypal.co.uk,paypal.de,paypal.fr|PayPal|money
+wise.com,transferwise.com|!Wise|money
+revolut.com|Revolut|money
+monzo.com|Monzo|money
+starlingbank.com|Starling Bank|money|Starling
+barclays.co.uk,barclays.com,barclaycard.co.uk|Barclays|money|Barclaycard
+hsbc.co.uk,hsbc.com,hsbc.fr|HSBC|money
+lloydsbank.com,lloydsbank.co.uk|Lloyds Bank|money|Lloyds
+natwest.com|NatWest|money
+rbs.co.uk|Royal Bank of Scotland|money
+santander.co.uk,santander.com,santander.de,santander.es,bancosantander.es|Santander|money
+halifax.co.uk|Halifax|money
+nationwide.co.uk|Nationwide|money
+tsb.co.uk|TSB|money
+firstdirect.com|First Direct|money
+metrobankonline.co.uk|Metro Bank|money
+co-operativebank.co.uk|Co-operative Bank|money
+virginmoney.com|Virgin Money|money
+nsandi.com|NS&I|money|Premium Bonds
+hl.co.uk,hargreaveslansdown.co.uk|Hargreaves Lansdown|money
+ajbell.co.uk|AJ Bell|money
+trading212.com|Trading 212|money
+freetrade.io|Freetrade|money
+klarna.com|Klarna|money
+affirm.com|Affirm|money
+clearpay.co.uk,afterpay.com|Afterpay|money|Clearpay
+coinbase.com|Coinbase|money
+kraken.com|Kraken|money
+binance.com|Binance|money
+n26.com|N26|money
+ing.de,ing.nl,ing.be,ing.es,ing.com|ING|money
+dkb.de|DKB|money
+comdirect.de|comdirect|money
+commerzbank.de|Commerzbank|money
+deutsche-bank.de,db.com|Deutsche Bank|money
+sparkasse.de|Sparkasse|money
+postbank.de|Postbank|money
+bnpparibas.com,bnpparibas.net|BNP Paribas|money
+societegenerale.fr|Société Générale|money
+credit-agricole.fr|Crédit Agricole|money
+labanquepostale.fr|La Banque Postale|money
+boursorama.com,boursobank.com|BoursoBank|money|Boursorama
+abnamro.nl|ABN AMRO|money
+rabobank.nl|Rabobank|money
+bunq.com|bunq|money
+bbva.es,bbva.com|BBVA|money
+caixabank.es,caixabank.com|CaixaBank|money
+intesasanpaolo.com|Intesa Sanpaolo|money
+unicredit.it|UniCredit|money
+aib.ie|AIB|money
+bankofireland.com|Bank of Ireland|money
+ptsb.ie|PTSB|money
+seb.se|SEB|money
+swedbank.se|Swedbank|money
+handelsbanken.se|Handelsbanken|money
+nordea.com,nordea.se,nordea.dk,nordea.fi,nordea.no|Nordea|money
+danskebank.dk,danskebank.com|Danske Bank|money
+dnb.no|DNB|money
+ubs.com|UBS|money
+experian.com,experian.co.uk|Experian|money
+equifax.com,equifax.co.uk|Equifax|money
+transunion.com,transunion.co.uk|TransUnion|money
+creditkarma.com,creditkarma.co.uk|Credit Karma|money
+clearscore.com|ClearScore|money
+geico.com|GEICO|insurance
+progressive.com|!Progressive|insurance
+statefarm.com|State Farm|insurance
+allstate.com|Allstate|insurance
+libertymutual.com|Liberty Mutual|insurance
+usaa.com|USAA|insurance
+lemonade.com|!Lemonade|insurance
+aviva.co.uk,aviva.com|Aviva|insurance
+directline.com|Direct Line|insurance
+admiral.com|Admiral|insurance
+axa.co.uk,axa.fr,axa.de,axa.com|AXA|insurance
+lv.com|LV=|insurance
+churchill.com|!Churchill|insurance
+hastingsdirect.com|Hastings Direct|insurance
+legalandgeneral.com|Legal & General|insurance
+vitality.co.uk|Vitality|insurance
+bupa.co.uk,bupa.com|Bupa|insurance
+allianz.de,allianz.com,allianz.fr|Allianz|insurance
+huk.de|HUK-COBURG|insurance
+ergo.de|ERGO|insurance
+generali.it,generali.com|Generali|insurance
+petplan.co.uk|Petplan|insurance
+trupanion.com|Trupanion|insurance
+zurich.com,zurich.co.uk|!Zurich|insurance
+aetna.com|Aetna|insurance
+cigna.com|Cigna|insurance
+uhc.com,unitedhealthcare.com|UnitedHealthcare|insurance
+anthem.com|Anthem|insurance
+bcbs.com|Blue Cross Blue Shield|insurance
+kaiserpermanente.org|Kaiser Permanente|insurance
+humana.com|Humana|insurance
+tk.de|Techniker Krankenkasse|insurance
+aok.de|AOK|insurance
+barmer.de|Barmer|insurance
+zilverenkruis.nl|Zilveren Kruis|insurance
+comparethemarket.com|Compare the Market|insurance
+moneysupermarket.com|MoneySuperMarket|insurance
+gocompare.com|GoCompare|insurance
+cvs.com|!CVS|health
+walgreens.com|Walgreens|health
+boots.com|!Boots|health
+nhs.uk,nhs.net|NHS|health
+zocdoc.com|Zocdoc|health
+specsavers.co.uk,specsavers.com|Specsavers|health
+doctolib.fr,doctolib.de|Doctolib|health
+onemedical.com|One Medical|health
+xfinity.com,comcast.com|Xfinity|home|Comcast
+verizon.com,verizonwireless.com|Verizon|home
+att.com|AT&T|home
+t-mobile.com|T-Mobile|home
+spectrum.com,charter.com|!Spectrum|home
+cox.com|!Cox|home
+pge.com|PG&E|home
+coned.com|Con Edison|home
+duke-energy.com|Duke Energy|home
+sce.com|Southern California Edison|home
+britishgas.co.uk|British Gas|home
+octopus.energy|Octopus Energy|home
+edfenergy.com,edf.fr|EDF|home
+eonnext.com,eon.co.uk,eon.de|E.ON|home
+ovoenergy.com|OVO|home
+scottishpower.co.uk|ScottishPower|home
+bt.com|!BT|home
+sky.com|!Sky|home
+virginmedia.com|Virgin Media|home
+ee.co.uk|!EE|home
+o2.co.uk,o2online.de|!O2|home
+vodafone.co.uk,vodafone.de,vodafone.com,vodafone.es,vodafone.it,vodafone.nl|Vodafone|home
+three.co.uk|!Three|home
+giffgaff.com|giffgaff|home
+plus.net|Plusnet|home
+talktalk.co.uk|TalkTalk|home
+thameswater.co.uk|Thames Water|home
+stwater.co.uk|Severn Trent|home
+unitedutilities.com|United Utilities|home
+anglianwater.co.uk|Anglian Water|home
+telekom.de|Telekom|home
+1und1.de|1&1|home
+vattenfall.de,vattenfall.com|Vattenfall|home
+orange.com|!Orange|home
+bouyguestelecom.fr|Bouygues Telecom|home
+engie.fr,engie.com|Engie|home
+totalenergies.fr|TotalEnergies|home
+kpn.com|KPN|home
+ziggo.nl|Ziggo|home
+eneco.nl|Eneco|home
+movistar.es|Movistar|home
+iberdrola.es|Iberdrola|home
+endesa.com|Endesa|home
+enel.it|Enel|home
+eir.ie|!eir|home
+electricireland.ie|Electric Ireland|home
+bordgaisenergy.ie|Bord Gáis Energy|home
+netflix.com|Netflix|online
+spotify.com|Spotify|online
+disneyplus.com|Disney+|online
+hulu.com|Hulu|online
+max.com,hbomax.com|!Max|online
+audible.com,audible.co.uk,audible.de|Audible|online
+nytimes.com|New York Times|online
+washingtonpost.com|Washington Post|online
+theguardian.com|The Guardian|online
+economist.com|The Economist|online
+ft.com|Financial Times|online
+patreon.com|Patreon|online
+dazn.com|DAZN|online
+apple.com|Apple|online|Apple ID
+google.com|!Google|online
+microsoft.com|Microsoft|online
+dropbox.com|Dropbox|online
+adobe.com|Adobe|online
+amazon.com,amazon.co.uk,amazon.de,amazon.fr,amazon.es,amazon.it,amazon.nl,amazon.ca,amazon.com.au,amazon.se,amazon.pl,amazon.com.be|Amazon|online
+ebay.com,ebay.co.uk,ebay.de,ebay.fr,ebay.it,ebay.es|eBay|online
+etsy.com|Etsy|online
+walmart.com|Walmart|online
+target.com|!Target|online
+costco.com,costco.co.uk|Costco|online
+bestbuy.com|Best Buy|online
+homedepot.com|Home Depot|online
+lowes.com|Lowe's|online
+ikea.com|IKEA|online
+argos.co.uk|Argos|online
+johnlewis.com,johnlewis.co.uk|John Lewis|online
+tesco.com|Tesco|online|Clubcard
+sainsburys.co.uk|Sainsbury's|online
+asda.com|Asda|online
+ocado.com|Ocado|online
+marksandspencer.com|Marks & Spencer|online|M&S
+next.co.uk|!Next|online
+asos.com|ASOS|online
+zalando.de,zalando.co.uk,zalando.fr,zalando.nl,zalando.es,zalando.it,zalando.com|Zalando|online
+otto.de|!Otto|online
+fnac.com|Fnac|online
+cdiscount.com|Cdiscount|online
+bol.com|bol.com|online
+coolblue.nl,coolblue.be|Coolblue|online
+aliexpress.com|AliExpress|online
+temu.com|Temu|online
+shein.com|SHEIN|online
+uniqlo.com|Uniqlo|online
+hm.com|H&M|online
+zara.com|Zara|online
+nike.com|Nike|online
+wayfair.com,wayfair.co.uk|Wayfair|online
+chewy.com|Chewy|online
+superdrug.com|Superdrug|health
+hellofresh.com,hellofresh.co.uk,hellofresh.de,hellofresh.fr,hellofresh.nl|HelloFresh|online
+gousto.co.uk|Gousto|online
+uber.com|Uber|online|Uber Eats
+lyft.com|Lyft|online
+doordash.com|DoorDash|online
+deliveroo.co.uk,deliveroo.com,deliveroo.fr|Deliveroo|online
+just-eat.co.uk,justeat.com,just-eat.ie|Just Eat|online
+grubhub.com|Grubhub|online
+instacart.com|Instacart|online
+lieferando.de|Lieferando|online
+thuisbezorgd.nl|Thuisbezorgd|online
+wolt.com|Wolt|online
+glovoapp.com|Glovo|online
+airbnb.com,airbnb.co.uk|Airbnb|online
+booking.com|Booking.com|online
+expedia.com,expedia.co.uk|Expedia|online
+britishairways.com,ba.com|British Airways|online
+ryanair.com|Ryanair|online
+easyjet.com|easyJet|online
+delta.com|!Delta|online
+united.com|United Airlines|online
+aa.com|American Airlines|online
+southwest.com|Southwest Airlines|online
+lufthansa.com|Lufthansa|online|Miles & More
+airfrance.fr,airfrance.com|Air France|online
+klm.com|KLM|online
+emirates.com|Emirates|online
+marriott.com|Marriott|online
+hilton.com|Hilton|online
+ihg.com|IHG|online
+trainline.com|Trainline|car
+amtrak.com|Amtrak|car
+bahn.de|Deutsche Bahn|car
+sncf-connect.com|SNCF|car
+puregym.com|PureGym|online
+planetfitness.com|Planet Fitness|online
+classpass.com|ClassPass|online
+onepeloton.com|Peloton|online
+nationaltrust.org.uk|National Trust|online
+english-heritage.org.uk|English Heritage|online
+aaa.com|!AAA|car
+theaa.com|The AA|car
+rac.co.uk|!RAC|car
+adac.de|ADAC|car
+tesla.com|Tesla|car
+e-zpassny.com,ezpassnj.com,ezpassva.com|E-ZPass|car
+tfl.gov.uk|Transport for London|car|TfL
+ringgo.co.uk|RingGo|car
+paybyphone.com|PayByPhone|car
+gov.uk|GOV.UK|post
+hmrc.gov.uk|HMRC|post
+dvla.gov.uk|DVLA|car
+irs.gov|IRS|post
+ssa.gov|Social Security|post
+usps.com|USPS|post
+royalmail.com|Royal Mail|post
+slc.co.uk|Student Loans Company|work
+studentaid.gov|Federal Student Aid|work
+navient.com|Navient|work
+nelnet.com|Nelnet|work
+mohela.com|MOHELA|work
+tvlicensing.co.uk|TV Licensing|home
+elster.de|ELSTER|post
+impots.gouv.fr|Impôts|post
+caf.fr|CAF|post
+ameli.fr|Assurance Maladie|health
+belastingdienst.nl|Belastingdienst|post
+revenue.ie|Revenue|post
+skatteverket.se|Skatteverket|post
+adp.com|ADP|work
+workday.com|Workday|work
+paychex.com|Paychex|work`.split('\n').map((l,i)=>{const[d,n,c,x]=l.split('|');const nm=!n.startsWith('!');const name=nm?n:n.slice(1);return{id:'s'+i,domains:d.split(','),name,cat:c,nm,alias:x?x.split(','):[]}});
+const DOM=new Map();SERVICES.forEach(s=>s.domains.forEach(d=>DOM.set(d,s)));
+
+const PERSONAL=/^(gmail\.com|googlemail\.com|outlook\.[a-z.]+|hotmail\.[a-z.]+|live\.[a-z.]+|msn\.com|yahoo\.[a-z.]+|ymail\.com|icloud\.com|me\.com|mac\.com|aol\.[a-z.]+|proton\.me|protonmail\.[a-z]+|pm\.me|gmx\.[a-z.]+|web\.de|t-online\.de|freenet\.de|orange\.fr|wanadoo\.fr|free\.fr|sfr\.fr|laposte\.net|libero\.it|virgilio\.it|tiscali\.[a-z.]+|btinternet\.com|talktalk\.net|blueyonder\.co\.uk|ntlworld\.com|hey\.com|fastmail\.[a-z]+|zoho\.com|yandex\.[a-z]+|mail\.ru|seznam\.cz|wp\.pl|o2\.pl|onet\.pl|interia\.pl|comcast\.net|att\.net|verizon\.net|sbcglobal\.net|cox\.net|eircom\.net|telenet\.be|skynet\.be|kpnmail\.nl|home\.nl|ziggo\.nl|bluewin\.ch|hispeed\.ch|telia\.com|online\.no|tutanota\.[a-z]+|mailbox\.org|posteo\.[a-z]+)$/;
+const NOISE=/(^|\.)(facebook\.com|facebookmail\.com|instagram\.com|twitter\.com|x\.com|linkedin\.com|pinterest\.com|reddit\.com|redditmail\.com|tiktok\.com|quora\.com|medium\.com|substack\.com|github\.com|gitlab\.com|slack\.com|zoom\.us|discord\.com|whatsapp\.com|telegram\.org|nextdoor\.com|meetup\.com|youtube\.com|calendly\.com|docusign\.net|mailchimp\.com|eventbrite\.com|strava\.com|duolingo\.com|notion\.so|figma\.com|atlassian\.com|trello\.com)$/;
+const GUESS=[[/bank|credit|card|financ|capital|invest|pension|loan|mortgage|savings|wealth|broker|banque|sparkass|kasse/i,'money'],[/insur|assur|versicher|seguro|polic/i,'insurance'],[/energy|power|electric|gas|water|broadband|telecom|mobile|fibre|fiber|wireless|utility|utilities/i,'home'],[/\.gov|gouv|gob\.|council|hmrc|irs\.|tax|stadt|gemeente|comune/i,'post'],[/health|dental|dentist|clinic|pharm|medical|doctor|surgery|optic|vet/i,'health'],[/school|univ|college|\.edu|\.ac\.|academy|payroll|hr\./i,'work'],[/parking|toll|motor|auto|car|rail|train/i,'car']];
+function guessCat(dom,name){const s=dom+' '+name;for(const[r,c]of GUESS)if(r.test(s))return c;return'other'}
+
+// ---------- state (memory only) ----------
+const S={from:'UK',to:'UK',date:'',flags:new Set(['drive','work']),who:'',contact:'',oldAddr:'',newAddr:'',
+  done:new Set(),hidden:new Set(),custom:[],found:new Map(),unknown:new Map(),added:new Map(),people:new Map(),contacts:[],scanned:0};
+let dirty=false;
+
+// guess country from browser language
+(function(){const l=(navigator.language||'en-GB').toUpperCase();const r=(l.split('-')[1]||'');const map={GB:'UK',UK:'UK'};const c=map[r]||(COUNTRIES[r]?r:null)||({DE:'DE',FR:'FR',NL:'NL',ES:'ES',IT:'IT',SV:'SE',DA:'DK',NB:'NO',NN:'NO',FI:'FI',PL:'PL',PT:'PT'}[l.slice(0,2)])||(l==='EN-US'?'US':null);if(c){S.from=S.to=c}})();
+
+// ---------- move form ----------
+const order=['US','UK','IE','DE','FR','NL','BE','ES','PT','IT','AT','CH','SE','DK','NO','FI','PL','CA','AU','OTHER'];
+for(const sel of[$('#from'),$('#to')])sel.innerHTML=order.map(k=>`<option value="${k}">${esc(COUNTRIES[k].n)}</option>`).join('');
+$('#from').value=S.from;$('#to').value=S.to;
+$('#flags').innerHTML=FLAGS.map(([k,l])=>`<label class="chk"><input type="checkbox" id="flag-${k}" value="${k}" ${S.flags.has(k)?'checked':''}>${esc(l)}</label>`).join('');
+$('#from').onchange=e=>{S.from=e.target.value;update()};
+$('#to').onchange=e=>{S.to=e.target.value;update()};
+$('#date').oninput=e=>{S.date=e.target.value;stamp();renderPeople(true)};
+$('#flags').onchange=e=>{const k=e.target.value;e.target.checked?S.flags.add(k):S.flags.delete(k);update()};
+for(const k of['who','contact','oldAddr','newAddr'])$('#'+k).oninput=e=>{S[k]=e.target.value;dirty=true;renderPeople(true)};
+
+function fmtDate(d){if(!d)return'';const t=new Date(d+'T12:00:00');return isNaN(t)?d:t.toLocaleDateString(undefined,{day:'numeric',month:'long',year:'numeric'})}
+function stamp(){$('#stampRoute').textContent=`${COUNTRIES[S.from].s} → ${COUNTRIES[S.to].s}`;$('#stampDate').textContent=S.date?fmtDate(S.date):'Date not set'}
+
+// ---------- checklist ----------
+function buildItems(){
+  const intl=S.from!==S.to, out=[];
+  const add=(a,src,country)=>{const[cat,name,note,url,how,when,flag]=a;if(flag&&!S.flags.has(flag))return;out.push({id:src+'|'+cat+'|'+name,cat,name,note,url,how,when,country})};
+  COUNTRIES[S.from].items.forEach(a=>{if(a[7]==='from'||(intl&&a[7]==='leave'))add(a,S.from,intl?COUNTRIES[S.from].s:'')});
+  if(intl)COUNTRIES[S.to].items.forEach(a=>{if(a[7]==='to')add(a,S.to,COUNTRIES[S.to].s)});
+  else COUNTRIES[S.to].items.forEach(a=>{if(a[7]==='to')add(a,S.to,'')});
+  if(intl)ABROAD.forEach(a=>add(a,'abroad',''));
+  GENERIC.forEach(a=>add(a,'gen',''));
+  for(const[id,f]of S.found)out.push({id:'mail|'+id,cat:f.svc.cat,name:f.svc.name,note:'',how:'on',when:'a',mail:f.count});
+  for(const[dom,u]of S.added)out.push({id:'dom|'+dom,cat:u.cat,name:u.name||dom,note:dom,how:'on',when:'a',mail:u.count});
+  S.custom.forEach(c=>out.push({id:'c|'+c.id,cat:c.cat,name:c.name,note:'',how:'',when:'',custom:true}));
+  return out;
+}
+function searchUrl(it){const c=COUNTRIES[S.to].n;return'https://duckduckgo.com/?q='+encodeURIComponent(`${it.name} change of address ${S.to==='OTHER'?'':c}`.trim())}
+function visible(){return buildItems().filter(i=>!S.hidden.has(i.id))}
+
+function renderList(){
+  const items=visible(), hideDone=$('#hideDone').checked;
+  const nDone=items.filter(i=>S.done.has(i.id)).length;
+  $('#meterLbl').textContent=`${nDone} of ${items.length} done`;
+  $('#meterBar').style.width=(items.length?nDone/items.length*100:0)+'%';
+  $('#bList').textContent=items.length-nDone;
+  $('#sumCount').textContent=items.length;
+  const hiddenN=buildItems().filter(i=>S.hidden.has(i.id)).length;
+  $('#restore').hidden=!hiddenN;$('#restore').textContent=`Show ${hiddenN} removed`;
+  let html='';
+  for(const[cat,label]of CATS){
+    const g=items.filter(i=>i.cat===cat&&!(hideDone&&S.done.has(i.id))).sort((a,b)=>(WHEN_ORDER[a.when]??3)-(WHEN_ORDER[b.when]??3));
+    if(!g.length)continue;
+    html+=`<div class="cat"><h3>${esc(label)} <span>${g.length}</span></h3>`+g.map(slip).join('')+`</div>`;
+  }
+  $('#list').innerHTML=html||`<div class="empty">${hideDone&&items.length?'Everything is done. Nice work.':'Nothing here yet. Pick your countries on step 1.'}</div>`;
+}
+function slip(it){
+  const d=S.done.has(it.id), id='i'+hash(it.id);
+  const meta=[];
+  if(it.country)meta.push(`<span class="stamp-s">${esc(it.country)}</span>`);
+  if(it.when)meta.push(`<span class="stamp-s when-${it.when}">${WHEN[it.when]}</span>`);
+  if(it.how)meta.push(`<span class="stamp-s">${HOW[it.how]}</span>`);
+  if(it.mail)meta.push(`<span class="stamp-s mail">In your email ×${it.mail}</span>`);
+  const links=[];
+  if(it.url)links.push(`<a href="${esc(it.url)}" target="_blank" rel="noopener">Official page ↗</a>`);
+  if(!it.custom)links.push(`<a href="${esc(searchUrl(it))}" target="_blank" rel="noopener">${it.url?'Search':'How to update'} ↗</a>`);
+  return `<div class="slip${d?' done':''}" data-id="${esc(it.id)}">
+    <input type="checkbox" id="${id}" ${d?'checked':''} aria-label="Done: ${esc(it.name)}">
+    <div class="body"><label class="name" for="${id}">${esc(it.name)}</label>${it.note?`<p class="note">${esc(it.note)}</p>`:''}
+      ${meta.length?`<div class="meta">${meta.join('')}</div>`:''}${links.length?`<div class="links">${links.join('')}</div>`:''}</div>
+    <button class="rm" title="Remove, doesn't apply to me" aria-label="Remove ${esc(it.name)}">×</button></div>`;
+}
+function hash(s){let h=0;for(const c of s)h=(h*31+c.charCodeAt(0))|0;return(h>>>0).toString(36)}
+$('#list').addEventListener('change',e=>{const el=e.target.closest('.slip');if(!el)return;const id=el.dataset.id;e.target.checked?S.done.add(id):S.done.delete(id);dirty=true;renderList()});
+$('#list').addEventListener('click',e=>{if(!e.target.classList.contains('rm'))return;const id=e.target.closest('.slip').dataset.id;if(id.startsWith('c|'))S.custom=S.custom.filter(c=>'c|'+c.id!==id);else S.hidden.add(id);renderList()});
+$('#hideDone').onchange=renderList;
+$('#restore').onclick=()=>{S.hidden.clear();renderList()};
+$('#customCat').innerHTML=CATS.filter(([k])=>k!=='other').map(([k,l])=>`<option value="${k}" ${k==='custom'?'selected':''}>${esc(l)}</option>`).join('');
+const addCustom=()=>{const n=$('#customName').value.trim();if(!n)return;S.custom.push({id:Date.now().toString(36),name:n,cat:$('#customCat').value});$('#customName').value='';dirty=true;renderList();toast('Added')};
+$('#customAdd').onclick=addCustom;$('#customName').onkeydown=e=>{if(e.key==='Enter')addCustom()};
+
+// ---------- email scanning ----------
+
+function decodeWords(s){return s.replace(/=\?([^?]+)\?([bqBQ])\?([^?]*)\?=/g,(m,cs,enc,txt)=>{try{let bytes;if(enc.toUpperCase()==='B'){bytes=Uint8Array.from(atob(txt),c=>c.charCodeAt(0))}else{const t=txt.replace(/_/g,' ');const arr=[];for(let i=0;i<t.length;i++){if(t[i]==='='&&/^[0-9a-f]{2}$/i.test(t.substr(i+1,2))){arr.push(parseInt(t.substr(i+1,2),16));i+=2}else arr.push(t.charCodeAt(i))}bytes=new Uint8Array(arr)}return new TextDecoder(cs).decode(bytes)}catch{return m}})}
+function regDomain(d){const p=d.split('.');if(p.length>2&&/^(co|com|org|gov|ac|net|ltd|plc|me|nhs)$/.test(p[p.length-2])&&p[p.length-1].length===2)return p.slice(-3).join('.');return p.slice(-2).join('.')}
+function lookup(d){const p=d.split('.');for(let i=0;i<p.length-1;i++){const s=DOM.get(p.slice(i).join('.'));if(s)return s}return null}
+function record(addr,name){
+  addr=addr.toLowerCase().trim().replace(/^mailto:/,'');const at=addr.lastIndexOf('@');if(at<1)return;
+  const dom=addr.slice(at+1).replace(/[>.,;]+$/,'');if(!/\.[a-z]{2,}$/.test(dom))return;
+  S.scanned++;
+  if(PERSONAL.test(dom)){const p=S.people.get(addr)||{addr,name:'',count:0};p.count++;if(name&&!p.name)p.name=name;S.people.set(addr,p);return}
+  if(NOISE.test(dom))return;
+  const svc=lookup(dom);
+  if(svc){const f=S.found.get(svc.id)||{svc,count:0};f.count++;S.found.set(svc.id,f);return}
+  const rd=regDomain(dom);const u=S.unknown.get(rd)||{dom:rd,name:'',count:0};u.count++;
+  if(name&&!u.name&&!/@/.test(name))u.name=name.replace(/^(no-?reply|info|hello|support|team|news)\b\s*/i,'').slice(0,60);
+  S.unknown.set(rd,u);
+}
+function parseFromHeader(v){
+  v=decodeWords(v);
+  const m=v.match(/<\s*([^<>\s]+@[^<>\s]+)\s*>/)||v.match(/([\w.+'&%-]+@[\w-]+(?:\.[\w-]+)+)/);
+  if(!m)return;
+  const name=v.replace(/<[^>]*>/g,'').replace(m[1],'').replace(/["']/g,'').trim();
+  record(m[1],name);
+}
+const EMAIL_RE=/[\w.+'%-]+@[\w-]+(?:\.[\w-]+)*\.[a-z]{2,}/gi;
+function scanText(text){
+  // full-text: any address, plus known services named in the text (copied inbox pages show sender names, not addresses)
+  for(const line of text.split('\n')){
+    if(/<[^<>\s]+@[^<>\s]+>/.test(line)){for(const part of line.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/))parseFromHeader(part.replace(/^\s*(from|to|cc|reply-to):/i,''))}
+    else for(const m of line.matchAll(EMAIL_RE))record(m[0],'');
+  }
+  const seen=new Set([...S.found.keys()]);
+  for(const s of SERVICES){
+    if(seen.has(s.id))continue;
+    const names=(s.nm?[s.name]:[]).concat(s.alias);
+    let n=0;for(const nm of names){const re=new RegExp('(^|[^\\p{L}\\p{N}])'+nm.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'(?=$|[^\\p{L}\\p{N}])','giu');n+=(text.match(re)||[]).length}
+    if(n){S.found.set(s.id,{svc:s,count:n})}
+  }
+}
+
+let stopScan=false;
+async function scanFiles(files){
+  stopScan=false;$('#scanProg').hidden=false;
+  const total=[...files].reduce((a,f)=>a+f.size,0)||1;let doneBytes=0, msgs=0;
+  const t0=performance.now();
+  for(const file of files){
+    const isMail=/\.(mbox|mbx|eml)$/i.test(file.name)||file.type==='message/rfc822'||!/\./.test(file.name);
+    if(!isMail&&file.size<50e6){const text=await file.text();scanText(text);doneBytes+=file.size;continue}
+    let inHdr=true,cur='',prevBlank=true,carry='';
+    const flush=()=>{if(/^from:/i.test(cur))parseFromHeader(cur.slice(5));cur=''};
+    const handle=line=>{
+      if(line.endsWith('\r'))line=line.slice(0,-1);
+      if(!inHdr&&line.startsWith('From ')&&(prevBlank||/^From \S+ +(Mon|Tue|Wed|Thu|Fri|Sat|Sun) /.test(line))){inHdr=true;cur='';msgs++;prevBlank=false;return}
+      if(inHdr){
+        if(line===''){flush();inHdr=false;prevBlank=true;return}
+        if(/^[ \t]/.test(line)&&cur){cur+=' '+line.trim()}else{flush();cur=line}
+        return;
+      }
+      prevBlank=line==='';
+    };
+    const CH=8*1024*1024;const dec=new TextDecoder('utf-8');
+    for(let off=0;off<file.size;off+=CH){
+      if(stopScan)break;
+      const buf=await file.slice(off,off+CH).arrayBuffer();
+      const text=carry+dec.decode(buf,{stream:off+CH<file.size});
+      const lines=text.split('\n');carry=lines.pop();
+      for(const l of lines)handle(l);
+      doneBytes+=buf.byteLength;
+      $('#scanBar').style.width=(doneBytes/total*100)+'%';
+      $('#scanLbl').textContent=`Reading ${file.name}: ${fmtBytes(doneBytes)} of ${fmtBytes(total)}`;
+      await new Promise(r=>setTimeout(r,0));
+    }
+    if(carry)handle(carry);flush();
+    if(!msgs)msgs=1;
+  }
+  $('#scanBar').style.width='100%';
+  $('#scanLbl').textContent=(stopScan?'Stopped. ':'Done. ')+`Read ${fmtBytes(doneBytes)} in ${((performance.now()-t0)/1000).toFixed(1)}s.`;
+  dirty=true;afterScan();
+}
+function fmtBytes(b){return b>1e9?(b/1e9).toFixed(2)+' GB':b>1e6?(b/1e6).toFixed(1)+' MB':Math.round(b/1e3)+' KB'}
+$('#scanStop').onclick=()=>{stopScan=true};
+const drop=$('#drop'),fileIn=$('#file');
+drop.onclick=()=>fileIn.click();
+drop.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();fileIn.click()}};
+fileIn.onchange=()=>{if(fileIn.files.length)scanFiles(fileIn.files);fileIn.value=''};
+drop.ondragover=e=>{e.preventDefault();drop.classList.add('over')};
+drop.ondragleave=()=>drop.classList.remove('over');
+drop.ondrop=e=>{e.preventDefault();drop.classList.remove('over');if(e.dataTransfer.files.length)scanFiles(e.dataTransfer.files)};
+$('#scanPaste').onclick=()=>{const t=$('#paste').value;if(!t.trim()){toast('Paste something first');return}scanText(t);$('#paste').value='';dirty=true;afterScan()};
+$('#sample').onclick=()=>{$('#paste').value=`EXAMPLE TEXT, not your email
+Inbox
+Amazon.co.uk  Your Amazon.co.uk order has been dispatched
+Octopus Energy  Your latest bill is ready
+Aviva  Your home insurance renewal documents
+Netflix  Your payment was received
+Monzo  Your monthly statement
+"Thames Water" <billing@thameswater.co.uk>
+Vanguard <no-reply@vanguardinvestor.co.uk> Your quarterly statement
+"Riverside Allotment Society" <secretary@riversideallotments.org.uk>
+Bright Futures Pension <statements@brightfuturespension.co.uk>
+Auntie Pam <pam.wilson@btinternet.com>`;toast('Example loaded. Press Find services.')};
+
+function afterScan(){
+  $('#scanStat').textContent=S.scanned?`${S.scanned.toLocaleString()} sender addresses read`:'';
+  renderResults();renderList();
+  const b=$('#bMail');b.hidden=!S.found.size;b.textContent=S.found.size;
+  toast(`${S.found.size} known services found`);
+}
+let showAllUnknown=false;
+function renderResults(){
+  const found=[...S.found.values()].sort((a,b)=>b.count-a.count);
+  const unk=[...S.unknown.values()].filter(u=>!S.added.has(u.dom)).sort((a,b)=>b.count-a.count);
+  const ppl=[...S.people.values()].sort((a,b)=>b.count-a.count);
+  if(!found.length&&!unk.length&&!ppl.length&&!S.added.size){$('#results').innerHTML='';return}
+  let h='';
+  h+=`<div class="block"><header><h2>${found.length} known service${found.length===1?'':'s'} added</h2><p class="muted">These are on your checklist now, marked “In your email”. Remove any you've closed.</p></header>
+   <div class="chips">${found.map(f=>`<span class="chip">${esc(f.svc.name)} <span class="ct">×${f.count}</span><button class="x" data-unfind="${f.svc.id}" aria-label="Remove ${esc(f.svc.name)}">×</button></span>`).join('')||'<span class="muted">None yet.</span>'}</div></div>`;
+  if(unk.length||S.added.size){
+    const list=showAllUnknown?unk:unk.slice(0,40);
+    h+=`<div class="block"><header><h2>Other senders</h2><p class="muted">Companies this page doesn't recognise, most frequent first. Add any that hold your address: a local club, a small insurer, your old employer's pension.</p></header>
+     ${S.added.size?`<p style="font-size:.88rem"><b>Added:</b> ${[...S.added.values()].map(u=>esc(u.name||u.dom)).join(', ')}</p>`:''}
+     ${list.length?`<div class="tbl"><table><thead><tr><th>Sender</th><th>Looks like</th><th style="text-align:right">Emails</th><th></th></tr></thead><tbody>
+     ${list.map(u=>`<tr><td><div>${esc(u.name||u.dom)}</div>${u.name?`<div class="dom">${esc(u.dom)}</div>`:''}</td><td>${esc(CATNAME[guessCat(u.dom,u.name)])}</td><td class="num">${u.count}</td><td style="text-align:right"><button class="btn small" data-add="${esc(u.dom)}">Add</button></td></tr>`).join('')}
+     </tbody></table></div>`:''}
+     ${unk.length>40?`<button class="btn ghost" id="moreUnk">${showAllUnknown?'Show fewer':`Show all ${unk.length}`}</button>`:''}</div>`;
+  }
+  if(ppl.length){
+    h+=`<div class="block"><header><h2>People who email you</h2><p class="muted">Personal addresses (your own may be here too). Copy them for a “we've moved” email, or add someone to the tell-by-hand list.</p></header>
+     <div class="row"><button class="btn" id="copyPeople">Copy all ${ppl.length} addresses</button></div>
+     <div class="tbl"><table><thead><tr><th>Person</th><th style="text-align:right">Emails</th><th></th></tr></thead><tbody>
+     ${ppl.slice(0,30).map(p=>`<tr><td><div>${esc(p.name||p.addr)}</div>${p.name?`<div class="dom">${esc(p.addr)}</div>`:''}</td><td class="num">${p.count}</td><td style="text-align:right"><button class="btn small" data-person="${esc(p.name||p.addr)}">Tell by hand</button></td></tr>`).join('')}
+     </tbody></table></div></div>`;
+  }
+  $('#results').innerHTML=h;
+}
+$('#results').addEventListener('click',e=>{
+  const t=e.target;
+  if(t.dataset.unfind){S.found.delete(t.dataset.unfind);renderResults();renderList();$('#bMail').textContent=S.found.size;$('#bMail').hidden=!S.found.size}
+  else if(t.dataset.add){const u=S.unknown.get(t.dataset.add);S.added.set(u.dom,{...u,cat:(c=>c)(guessCat(u.dom,u.name))});renderResults();renderList();toast(`Added ${u.name||u.dom}`)}
+  else if(t.id==='moreUnk'){showAllUnknown=!showAllUnknown;renderResults()}
+  else if(t.id==='copyPeople'){copy([...S.people.keys()].join(', '),'Addresses copied')}
+  else if(t.dataset.person){addPerson(t.dataset.person,'Friendly');toast('Added to Tell by hand')}
+});
+
+// ---------- sign in and scan (Gmail API / Microsoft Graph, called straight from this browser) ----------
+// Fill these in after registering the app (see SETUP.md). Both are public identifiers, not secrets.
+const CONFIG={googleClientId:'', microsoftClientId:''};
+const SINCE_YEARS=3, MAX_MSGS=5000;
+const REDIRECT=location.origin+location.pathname;
+
+function setupAuth(){
+  const missing=[];
+  if(!CONFIG.googleClientId){$('#gBtn').disabled=true;missing.push('Gmail')}
+  else{const sc=document.createElement('script');sc.src='https://accounts.google.com/gsi/client';sc.async=true;document.head.appendChild(sc)}
+  if(!CONFIG.microsoftClientId){$('#mBtn').disabled=true;missing.push('Outlook')}
+  if(missing.length){$('#authNote').hidden=false;$('#authNote').textContent=`${missing.join(' and ')} sign-in isn't set up on this copy yet. You can still upload an export below.`}
+}
+function progress(label,frac){$('#scanProg').hidden=false;$('#scanLbl').textContent=label;$('#scanBar').style.width=Math.min(100,frac*100)+'%'}
+function authError(msg){$('#authNote').hidden=false;$('#authNote').textContent=msg;$('#scanProg').hidden=true}
+async function pool(items,n,fn){let i=0;await Promise.all(Array.from({length:n},async()=>{while(i<items.length&&!stopScan){await fn(items[i++])}}))}
+async function getJSON(url,token,tries=4){
+  for(let t=0;;t++){
+    const r=await fetch(url,{headers:{Authorization:'Bearer '+token}});
+    if(r.ok)return r.json();
+    if((r.status===429||r.status>=500)&&t<tries){await new Promise(z=>setTimeout(z,(2**t)*800+Math.random()*400));continue}
+    const e=new Error('HTTP '+r.status);e.status=r.status;throw e;
+  }
+}
+
+// Gmail: Google Identity Services popup, scope gmail.metadata (headers only, no bodies)
+$('#gBtn').onclick=()=>{
+  if(!window.google?.accounts?.oauth2){authError('Google sign-in is still loading. Try again in a moment.');return}
+  const client=google.accounts.oauth2.initTokenClient({client_id:CONFIG.googleClientId,scope:'https://www.googleapis.com/auth/gmail.metadata',
+    callback:r=>{if(r.error){authError('Google sign-in was cancelled or refused.');return}scanGmail(r.access_token)},
+    error_callback:()=>authError('The Google sign-in window was closed or blocked. Allow pop-ups for this site and try again.')});
+  client.requestAccessToken();
+};
+async function scanGmail(token){
+  stopScan=false;$('#authNote').hidden=true;const t0=performance.now();
+  try{
+    const ids=[];let page='';
+    const q=encodeURIComponent(`newer_than:${SINCE_YEARS}y -in:sent -in:chats -in:spam -in:trash`);
+    do{
+      const d=await getJSON(`https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=500&q=${q}${page?'&pageToken='+page:''}`,token);
+      (d.messages||[]).forEach(m=>ids.push(m.id));page=d.nextPageToken;
+      progress(`Finding emails: ${ids.length.toLocaleString()}`,0.05);
+    }while(page&&ids.length<MAX_MSGS&&!stopScan);
+    ids.length=Math.min(ids.length,MAX_MSGS);let n=0;
+    await pool(ids,8,async id=>{
+      const m=await getJSON(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=metadata&metadataHeaders=From`,token);
+      const h=(m.payload?.headers||[]).find(x=>/^from$/i.test(x.name));if(h)parseFromHeader(h.value);
+      if(++n%25===0||n===ids.length)progress(`Reading senders: ${n.toLocaleString()} of ${ids.length.toLocaleString()} emails`,n/ids.length);
+    });
+    progress(`${stopScan?'Stopped':'Done'}. Checked ${n.toLocaleString()} emails in ${Math.round((performance.now()-t0)/1000)}s.`,1);
+    google.accounts.oauth2.revoke(token,()=>{});
+    dirty=true;afterScan();
+  }catch(e){authError(e.status===403?'Google refused access. If this copy of Address Sweep is still in testing, your Google account must be added as a test user.':`Couldn't read Gmail (${e.message}). Try again.`)}
+}
+
+// Microsoft: OAuth code flow with PKCE in a popup, scope Mail.ReadBasic (sender and subject, no bodies)
+const b64url=buf=>btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+$('#mBtn').onclick=async()=>{
+  const popup=window.open('about:blank','ms-signin','width=500,height=650');
+  if(!popup){authError('The Microsoft sign-in window was blocked. Allow pop-ups for this site and try again.');return}
+  const verifier=b64url(crypto.getRandomValues(new Uint8Array(32)));
+  const challenge=b64url(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(verifier)));
+  const state=b64url(crypto.getRandomValues(new Uint8Array(16)));
+  const scope='https://graph.microsoft.com/Mail.ReadBasic';
+  popup.location=`https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${CONFIG.microsoftClientId}&response_type=code&redirect_uri=${encodeURIComponent(REDIRECT)}&response_mode=query&scope=${encodeURIComponent(scope)}&state=${state}&code_challenge=${challenge}&code_challenge_method=S256&prompt=select_account`;
+  const timer=setInterval(async()=>{
+    if(popup.closed){clearInterval(timer);return}
+    let url;try{url=new URL(popup.location.href)}catch{return}
+    if(url.origin!==location.origin)return;
+    clearInterval(timer);popup.close();
+    const p=url.searchParams;
+    if(p.get('state')!==state||!p.get('code')){authError('Microsoft sign-in was cancelled or refused.');return}
+    try{
+      const r=await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
+        body:new URLSearchParams({client_id:CONFIG.microsoftClientId,grant_type:'authorization_code',code:p.get('code'),redirect_uri:REDIRECT,code_verifier:verifier,scope})});
+      const tok=await r.json();if(!tok.access_token)throw new Error(tok.error_description||'no token');
+      scanOutlook(tok.access_token);
+    }catch(e){authError(`Microsoft sign-in failed (${e.message}).`)}
+  },400);
+};
+async function scanOutlook(token){
+  stopScan=false;$('#authNote').hidden=true;const t0=performance.now();
+  const since=new Date();since.setFullYear(since.getFullYear()-SINCE_YEARS);
+  let url=`https://graph.microsoft.com/v1.0/me/messages?$select=from&$top=500&$filter=receivedDateTime ge ${since.toISOString()}`,n=0;
+  try{
+    while(url&&n<MAX_MSGS&&!stopScan){
+      const d=await getJSON(url,token);
+      for(const m of d.value||[]){const a=m.from?.emailAddress;if(a?.address)record(a.address,a.name&&a.name!==a.address?a.name:'');n++}
+      url=d['@odata.nextLink'];progress(`Reading senders: ${n.toLocaleString()} emails`,n/MAX_MSGS);
+    }
+    progress(`${stopScan?'Stopped':'Done'}. Checked ${n.toLocaleString()} emails in ${Math.round((performance.now()-t0)/1000)}s.`,1);
+    dirty=true;afterScan();
+  }catch(e){authError(`Couldn't read Outlook mail (${e.message}). Try again.`)}
+}
+setupAuth();
+
+// ---------- people ----------
+const SUGGEST=[['Grandparents','Friendly'],['Older relatives','Friendly'],['Friends who send cards','Friendly'],['Old neighbours','Friendly'],['Place of worship or community group','Formal'],['Local clubs and societies','Formal'],['Solicitor or whoever holds your will','Formal'],['Executor of your will','Friendly'],['Milk or newspaper delivery','Formal'],['Cleaner, gardener or window cleaner','Formal'],['Childminder or babysitter','Friendly'],['Old landlord','Formal']];
+const HOWS=['Letter or card','Visit','Phone call','Tell next time I see them'];
+let pid=0;const PEOPLE=[];
+$('#suggest').innerHTML=SUGGEST.map(([n,t])=>`<button data-n="${esc(n)}" data-t="${t}">+ ${esc(n)}</button>`).join('');
+$('#suggest').onclick=e=>{const b=e.target.closest('button');if(!b)return;addPerson(b.dataset.n,b.dataset.t);b.remove()};
+const addTyped=()=>{const n=$('#personName').value.trim();if(!n)return;addPerson(n,'Friendly');$('#personName').value=''};
+$('#personAdd').onclick=addTyped;$('#personName').onkeydown=e=>{if(e.key==='Enter')addTyped()};
+function addPerson(name,tone){PEOPLE.push({id:++pid,name,tone,how:'Letter or card',note:'',done:false,open:false});dirty=true;renderPeople()}
+function letter(p){
+  const who=S.who.trim()||'[your name]', nw=S.newAddr.trim()||'[your new address]', old=S.oldAddr.trim();
+  const when=S.date?(new Date(S.date+'T12:00:00')>new Date()?`From ${fmtDate(S.date)}`:`Since ${fmtDate(S.date)}`):'From now on';
+  const formal=p.tone==='Formal';
+  const greet=formal?`Dear ${/^(solicitor|executor|old landlord|place|local|milk|cleaner|childminder)/i.test(p.name)?'Sir or Madam':p.name},`:`Dear ${p.name},`;
+  const body=formal
+   ?`I am writing to let you know that I am changing address. ${when}, please use:\n\n${nw}\n\n${old?`This replaces my previous address:\n\n${old}\n\n`:''}Please update your records and send any future correspondence to the new address.${S.contact?`\n\nYou can also reach me on ${S.contact}.`:''}\n\nYours faithfully,\n\n${who}`
+   :`Just a note to say we're moving! ${when}, our new address is:\n\n${nw}\n\n${old?`so please cross out the old one (${old.replace(/\n+/g,', ')}) in your address book. `:'Please pop it in your address book. '}${S.contact?`You can still reach us on ${S.contact}. `:''}We'd love to see you once we're settled.\n\nWith love,\n${who}`;
+  return greet+'\n\n'+body;
+}
+function renderPeople(lettersOnly){
+  if(lettersOnly){PEOPLE.forEach(p=>{const ta=$('#letter-'+p.id);if(ta)ta.value=letter(p)});return}
+  $('#bPeople').textContent=PEOPLE.filter(p=>!p.done).length;
+  $('#people').innerHTML=PEOPLE.length?PEOPLE.map(p=>`<div class="person${p.done?' done':''}" data-p="${p.id}">
+    <div class="top"><input type="checkbox" id="pd-${p.id}" ${p.done?'checked':''} aria-label="Told ${esc(p.name)}"><input type="text" id="pn-${p.id}" value="${esc(p.name)}" aria-label="Name" data-k="name"><button class="btn ghost small" data-del="${p.id}" aria-label="Remove">Remove</button></div>
+    <div class="fields">
+      <label class="f">How<select data-k="how" id="ph-${p.id}">${HOWS.map(h=>`<option ${h===p.how?'selected':''}>${h}</option>`).join('')}</select></label>
+      <label class="f">Letter style<select data-k="tone" id="pt-${p.id}">${['Friendly','Formal'].map(h=>`<option ${h===p.tone?'selected':''}>${h}</option>`).join('')}</select></label>
+      <label class="f">Their address or notes<input type="text" data-k="note" id="pa-${p.id}" value="${esc(p.note)}" placeholder="Where to post it, phone number…"></label>
+    </div>
+    <details class="letter" ${p.open?'open':''} data-open="${p.id}"><summary>Letter to copy</summary>
+      <textarea id="letter-${p.id}" aria-label="Letter text">${esc(letter(p))}</textarea>
+      <div class="row"><button class="btn small" data-copyletter="${p.id}">Copy letter</button><span class="muted" style="font-size:.8rem">Edit freely. Fill in your addresses on step 1.</span></div>
+    </details></div>`).join(''):`<div class="empty">No one added yet. Tap a suggestion above, or type a name.</div>`;
+}
+const P=id=>PEOPLE.find(p=>p.id===+id);
+$('#people').addEventListener('input',e=>{const box=e.target.closest('[data-p]');if(!box)return;const p=P(box.dataset.p),k=e.target.dataset.k;if(!k)return;p[k]=e.target.value;dirty=true;if(k!=='note'){const ta=$('#letter-'+p.id);if(ta)ta.value=letter(p)}});
+$('#people').addEventListener('change',e=>{const box=e.target.closest('[data-p]');if(!box||e.target.type!=='checkbox')return;P(box.dataset.p).done=e.target.checked;renderPeople()});
+$('#people').addEventListener('toggle',e=>{if(e.target.dataset.open)P(e.target.dataset.open).open=e.target.open},true);
+$('#people').addEventListener('click',e=>{const t=e.target;if(t.dataset.del){PEOPLE.splice(PEOPLE.findIndex(p=>p.id===+t.dataset.del),1);renderPeople()}else if(t.dataset.copyletter){copy($('#letter-'+t.dataset.copyletter).value,'Letter copied')}});
+
+// ---------- export ----------
+function exportText(){
+  const items=visible();const L=[];
+  L.push(`ADDRESS SWEEP: moving ${COUNTRIES[S.from].n} → ${COUNTRIES[S.to].n}${S.date?' on '+fmtDate(S.date):''}`);
+  if(S.newAddr.trim())L.push('New address: '+S.newAddr.trim().replace(/\n+/g,', '));
+  L.push(`${items.filter(i=>S.done.has(i.id)).length} of ${items.length} done`,'');
+  for(const[cat,label]of CATS){const g=items.filter(i=>i.cat===cat);if(!g.length)continue;L.push(label.toUpperCase());
+    g.forEach(i=>L.push(`${S.done.has(i.id)?'[x]':'[ ]'} ${i.name}${i.when?' ('+WHEN[i.when]+(i.how?', '+HOW[i.how].toLowerCase():'')+')':''}${i.url?' '+i.url:''}`));L.push('')}
+  if(PEOPLE.length){L.push('TELL BY HAND');PEOPLE.forEach(p=>L.push(`${p.done?'[x]':'[ ]'} ${p.name}: ${p.how.toLowerCase()}${p.note?' ('+p.note+')':''}`))}
+  return L.join('\n');
+}
+$('#copyAll').onclick=()=>copy(exportText(),'Checklist copied');
+$('#copyAddr').onclick=()=>{if(!S.newAddr.trim()){toast('Add your new address on step 1 first');return}copy(S.newAddr.trim(),'New address copied')};
+
+// ---------- helpers ----------
+async function copy(text,msg){try{await navigator.clipboard.writeText(text);toast(msg)}catch{const ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();let ok=false;try{ok=document.execCommand('copy')}catch{}ta.remove();toast(ok?msg:'Copy blocked here. Select the text and copy it yourself.')}}
+let tt;function toast(m){const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(tt);tt=setTimeout(()=>t.hidden=true,2400)}
+function showTab(name){$$('.tab').forEach(t=>t.setAttribute('aria-selected',String(t.id==='tab-'+name)));$$('.panel').forEach(p=>p.hidden=p.id!=='p-'+name);window.scrollTo({top:0})}
+$('.tablist').onclick=e=>{const t=e.target.closest('.tab');if(t)showTab(t.id.slice(4))};
+$$('[data-go]').forEach(b=>b.onclick=()=>showTab(b.dataset.go));
+if(['move','mail','list','people'].includes(location.hash.slice(1)))showTab(location.hash.slice(1));
+window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue=''}});
+function update(){stamp();renderList()}
+update();renderPeople();
+</script>
+
+</body>
+</html>
